@@ -5,21 +5,35 @@ from returntrack_logic import load_data, save_data, add_or_merge_entry, calculat
 
 st.set_page_config(page_title="ReturnTrack Dashboard", layout="wide")
 
+# ---- Styling for light theme ----
+light_style = '''
+<style>
+    body {
+        background-color: #f9f9f9;
+        color: #31333F;
+    }
+    .stApp {
+        background-color: #ffffff;
+    }
+</style>
+'''
+st.markdown(light_style, unsafe_allow_html=True)
+
 # ---- Title and Intro ----
-st.title("📦 ReturnTrack - Reusable Packaging Impact Dashboard")
-st.markdown("A sustainability initiative dashboard for tracking reusable material returns and their environmental & financial impact.")
+st.title("🚚 ReturnTrack – Sustainability Dashboard")
+st.markdown("Track reusable packaging returns and calculate your monthly sustainability impact for Volvo Eicher Commercial Vehicles Ltd.")
 
 # ---- Load Data ----
 df = load_data()
 
 # ---- Sidebar: Reuse Tuning ----
-st.sidebar.header("⚙️ Reuse Frequency Settings")
+st.sidebar.header("🔁 Reuse Frequency Settings")
 reuse_freq = {}
 for item in DEFAULT_REUSE:
     reuse_freq[item] = st.sidebar.slider(f"{item} reuse/month", 1, 50, DEFAULT_REUSE[item])
 
 # ---- Add New Entry ----
-st.subheader("➕ Add New Monthly Data")
+st.subheader("📥 Add New Monthly Data")
 with st.form("entry_form", clear_on_submit=True):
     item = st.selectbox("Item Type", list(DEFAULT_REUSE.keys()))
     qty = st.number_input("Quantity Returned", min_value=0, step=1)
@@ -42,23 +56,32 @@ if months:
     df_month = df[df["Month"] == selected_month]
     impact_df = calculate_impact(df_month, reuse_freq)
 
-    # ---- KPI Dashboard ----
-    st.subheader(f"📊 Impact Summary - {selected_month}")
-    kpi1, kpi2, kpi3 = st.columns(3)
-    kpi1.metric("CO₂ Avoided (kg)", f"{impact_df['CO2 Avoided (kg)'].sum():,.2f}")
-    kpi2.metric("Material Saved (kg)", f"{impact_df['Material Saved (kg)'].sum():,.2f}")
-    kpi3.metric("Cost Avoided (₹)", f"{impact_df['Cost Avoided (₹)'].sum():,.0f}")
+    # ---- KPI Summary Cards ----
+    st.subheader(f"📊 Monthly Impact Summary – {selected_month}")
+    kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+    kpi1.metric("🌍 CO₂ Avoided (kg)", f"{impact_df['CO2 Avoided (kg)'].sum():,.2f}")
+    kpi2.metric("📦 Material Saved (kg)", f"{impact_df['Material Saved (kg)'].sum():,.2f}")
+    kpi3.metric("💰 Cost Avoided (₹)", f"{impact_df['Cost Avoided (₹)'].sum():,.0f}")
+    kpi4.metric("🚛 Truckloads Avoided", f"{impact_df['Truckloads Avoided'].sum():,.2f}")
 
-    # ---- Data Table ----
-    st.dataframe(impact_df, use_container_width=True)
+    # ---- Impact Breakdown ----
+    st.markdown("### 📑 Impact Breakdown by Item")
+    for item in impact_df["Item Type"].unique():
+        item_data = impact_df[impact_df["Item Type"] == item].iloc[0]
+        with st.container():
+            st.markdown(f"**🧱 {item}**")
+            cols = st.columns(4)
+            cols[0].metric("CO₂ Avoided", f"{item_data['CO2 Avoided (kg)']:.2f} kg")
+            cols[1].metric("Material Saved", f"{item_data['Material Saved (kg)']:.2f} kg")
+            cols[2].metric("Cost Saved", f"₹{item_data['Cost Avoided (₹)']:.0f}")
+            cols[3].metric("Truckloads", f"{item_data['Truckloads Avoided']:.2f}")
 
     # ---- Download Report ----
-    csv = impact_df.to_csv(index=False).encode('utf-8')
     st.download_button(
-        label="📥 Download Impact Report (CSV)",
-        data=csv,
-        file_name=f'ReturnTrack_Impact_{selected_month}.csv',
-        mime='text/csv',
+        label="⬇️ Download Monthly Impact Report (CSV)",
+        data=impact_df.to_csv(index=False).encode("utf-8"),
+        file_name=f"ReturnTrack_Impact_{selected_month}.csv",
+        mime="text/csv"
     )
 else:
     st.info("Please add data to begin analysis.")
